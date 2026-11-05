@@ -60,3 +60,5 @@ kbd { font: inherit; border: 1px solid rgb(61 50 43 / 35%); border-radius: 6px; 
 
 /* The storm level: light ink on the dark night. */
 body.night #hud, body.night #card, body.night #toast { color: #f1e9dc; text-shadow: 0 0 14px rgb(10 14 30 / 90%); }
+
+body.clean #hud, body.clean #toast, body.clean #card, body.clean #done { display: none !important; }

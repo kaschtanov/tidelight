@@ -6,6 +6,8 @@ import { createBot } from "./bot.js";
 
 const params = new URLSearchParams(location.search);
 const MANUAL = params.has("manual"); // the playtest and the demo recording step the game frame by frame
+if (params.has("clean")) document.body.classList.add("clean"); // no HUD text: for thumbnails and trailers
+const FRAME_RIGHT = params.has("right"); // the keeper in the right third of the picture
 import "./style.css";
 
 const canvas = document.querySelector("#game");
@@ -317,8 +319,15 @@ function frame(dt) {
       const back = new THREE.Vector3(prev.x - g.x, 0, prev.z - g.z).normalize();
       want.set(g.x + back.x * 20 + back.z * 4, g.y + 7, g.z + back.z * 20 - back.x * 4);
     }
+    if (FRAME_RIGHT) {
+      // For the thumbnail: the camera steps left, so the keeper runs in the right third and the title has room on the left.
+      const left = new THREE.Vector3(-Math.cos(camYaw), 0, Math.sin(camYaw)).multiplyScalar(2.6);
+      want.add(left);
+    }
     camPos.lerp(want, 1 - Math.exp(-dt * (state.lit ? 1.2 : 6)));
-    look.lerp(state.lit ? new THREE.Vector3(g.x, g.y + 5, g.z) : new THREE.Vector3(target.x, target.y + 1.9, target.z), 1 - Math.exp(-dt * 8));
+    const lookAt = state.lit ? new THREE.Vector3(g.x, g.y + 5, g.z) : new THREE.Vector3(target.x, target.y + 1.9, target.z);
+    if (FRAME_RIGHT) lookAt.add(new THREE.Vector3(-Math.cos(camYaw), 0, Math.sin(camYaw)).multiplyScalar(state.lit ? 7 : 3.4));
+    look.lerp(lookAt, 1 - Math.exp(-dt * 8));
     camera.position.copy(camPos);
     camera.lookAt(look);
 

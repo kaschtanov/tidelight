@@ -6,7 +6,7 @@ import { mkdirSync, rmSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("/Users/keos_macbook_pro/Desktop/framiad-by-claude_10.1026/.worktrees/nav-variants/app-identity/node_modules/playwright-core");
-const OUT = "tools/out/frames";
+const OUT = process.env.CLEAN ? "tools/out/frames-clean" : "tools/out/frames";
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const levels = (process.argv[2] ?? "1,2,3").split(",").map((n) => Number(n) - 1);
@@ -17,7 +17,7 @@ const browser = await chromium.launch({
   args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-await page.goto("http://localhost:5180/?manual=1");
+await page.goto(`http://localhost:5180/?manual=1${process.env.CLEAN ? "&clean=1&right=1" : ""}`);
 await page.waitForFunction(() => window.__tidelight?.platformsNow);
 
 let n = 0;
