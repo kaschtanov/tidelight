@@ -4,6 +4,8 @@ An original 3-level watercolour game: a young lighthouse keeper crosses stepping
 coast. Built to test whether a real AI workflow can be published as a Framiad Frame. The workflow follows the steps Shikhar
 (@xikhar) shared for his game Sumiro (X thread, 3 Nov 2026); the world, character and code here are our own.
 
+**Play it:** <https://kaschtanov.github.io/tidelight/>
+
 Everything that becomes the Frame is logged below: what was made, with which tool and model, the prompt, and the cost.
 
 ## Workflow log
