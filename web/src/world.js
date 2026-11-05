@@ -246,7 +246,7 @@ export async function buildLevel(level, scene) {
 
   // The goal: a lighthouse (and the cottage on level 1).
   const g = level.goal;
-  const tint = g.tint ? { white: g.tint.band, red: g.tint.stripe } : {};
+  const tint = g.tint ?? {};
   const lh = ink(paint(await loadModel(g.kind), tint), 0.015);
   const top = level.platforms.find((p) => p.kind === "cliff" && Math.hypot(p.x - g.x, p.z - g.z) < p.r)?.top ?? 0;
   lh.position.set(g.x, top, g.z);

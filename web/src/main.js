@@ -94,6 +94,7 @@ async function startLevel(i) {
   state.level = level;
   state.lit = false;
   state.falls = 0;
+  fx.done = 0;
   const pal = level.palette;
   scene.fog = new THREE.Fog(pal.fog, pal.fogNear, pal.fogFar);
   renderer.setClearColor(pal.fog);
@@ -126,7 +127,7 @@ async function startLevel(i) {
 }
 
 // Card, fall flash and lightning run on game time (not CSS clocks), so a recording stepped frame by frame shows them right.
-const fx = { card: -99, flash: -99, bolt: -99, toast: -99 };
+const fx = { card: -99, flash: -99, bolt: -99, toast: -99, done: 0, doneHtml: "" };
 function showCard(kicker, title, sub) {
   ui.card.innerHTML = `<p class="kicker">${kicker}</p><h2>${title}</h2><p class="sub">${sub}</p>`;
   fx.card = state.time;
@@ -143,6 +144,12 @@ function drawFx() {
   const bolt = b >= 0 && b < 0.5 ? (b < 0.08 ? 0.5 : b < 0.15 ? 0.1 : 0.45 * (1 - (b - 0.15) / 0.35)) : 0;
   ui.flash.style.background = bolt > flash ? "#e8ecff" : "#f3ebdf";
   ui.flash.style.opacity = Math.max(flash, bolt);
+  if (fx.done && t >= fx.done) {
+    fx.done = 0;
+    ui.done.innerHTML = fx.doneHtml;
+    ui.done.hidden = false;
+    ui.done.querySelector("button").focus();
+  }
   const o = t - fx.toast;
   const on = o >= 0 && o < 1.8 ? Math.min(o / 0.25, 1, (1.8 - o) / 0.25) : 0;
   ui.toast.style.opacity = on;
@@ -179,14 +186,13 @@ function lightTheLamp() {
   try {
     localStorage.setItem("tidelight.unlocked", String(state.unlocked));
   } catch {}
-  setTimeout(() => {
+  fx.done = state.time + 3.2; // the end card waits until the lamp has had its moment (drawFx shows it)
+  fx.doneHtml = (() => {
     const last = next >= LEVELS.length;
-    ui.done.innerHTML = last
+    return last
       ? `<p class="kicker">The coast is lit</p><h2>Thank you, keeper.</h2><p class="sub">All three lamps burn again. Falls: ${state.falls}</p><button data-act="title">Back to the title</button>`
       : `<p class="kicker">Chapter ${state.level.id} complete</p><h2>${state.level.name}</h2><p class="sub">Falls: ${state.falls}</p><button data-act="next">Continue</button>`;
-    ui.done.hidden = false;
-    ui.done.querySelector("button").focus();
-  }, 2600);
+  })();
   g.lit = 0;
 }
 
@@ -304,7 +310,13 @@ function frame(dt) {
     const target = player.root.position;
     const dist = 6.8;
     const want = new THREE.Vector3(target.x + Math.sin(camYaw) * Math.cos(camPitch) * dist, target.y + 1.6 + Math.sin(camPitch) * dist, target.z + Math.cos(camYaw) * Math.cos(camPitch) * dist);
-    if (state.lit) want.set(g.x + 13, g.y + 7, g.z + 22); // pull back to watch the lamp
+    if (state.lit) {
+      // Pull back along the way she came, so the camera stays in the open (the cave walls are to the sides).
+      const plats = state.level.platforms;
+      const prev = plats[plats.length - 2];
+      const back = new THREE.Vector3(prev.x - g.x, 0, prev.z - g.z).normalize();
+      want.set(g.x + back.x * 20 + back.z * 4, g.y + 7, g.z + back.z * 20 - back.x * 4);
+    }
     camPos.lerp(want, 1 - Math.exp(-dt * (state.lit ? 1.2 : 6)));
     look.lerp(state.lit ? new THREE.Vector3(g.x, g.y + 5, g.z) : new THREE.Vector3(target.x, target.y + 1.9, target.z), 1 - Math.exp(-dt * 8));
     camera.position.copy(camPos);
