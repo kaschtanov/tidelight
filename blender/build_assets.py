@@ -69,12 +69,24 @@ def stone(seed, radius=1.0, height=0.5):
 
 
 def cliff(seed, radius=6.0, height=5.0):
-    """A cliff island: a tapered, noisy rock column with a flat grassy top (the top is its own material)."""
+    """A cliff island: a rock column with ledges and cracks, wider at the foot, with a flat grassy top (its own material)."""
     bm = bmesh.new()
-    bmesh.ops.create_cone(bm, cap_ends=True, segments=32, radius1=radius * 1.15, radius2=radius, depth=height + 2)
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=48, radius1=radius * 1.25, radius2=radius, depth=height + 2)
     bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, (height - 2) / 2))
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
-    lumpy(bm, seed, radius * 0.16, 0.45, top_flat=height)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=6, use_grid_fill=True)
+    off = Vector((seed * 5.3, seed * 2.9, seed * 8.1))
+    for v in bm.verts:
+        d = Vector((v.co.x, v.co.y, 0))
+        if d.length < 1e-4:
+            continue
+        a = math.atan2(v.co.y, v.co.x)
+        # big bays and headlands around the outline, ledges in bands up the side, fine cracks
+        bays = noise.noise(Vector((math.cos(a) * 1.3, math.sin(a) * 1.3, 0)) + off) * 0.22
+        ledge = math.sin(v.co.z * 2.2 + noise.noise(v.co * 0.4 + off) * 2.0) * 0.035
+        crack = noise.noise(v.co * 1.8 + off) * 0.06
+        v.co += d.normalized() * radius * (bays + ledge + crack)
+        if v.co.z > height - 0.05:
+            v.co.z = height + noise.noise(v.co * 0.5 + off) * 0.06
     return bm
 
 

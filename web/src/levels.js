@@ -1,10 +1,109 @@
 // The three levels as data. The player walks toward -z. Units are metres; the sea is at y = 0.
-// Platforms: "stone" (round, r = radius), "cliff" (round island with rock sides), "plank" (box: w × d, rotY), "jetty" (box).
+// Platforms: "stone" (round, r = radius), "cliff" (round island with rock sides), "plank"/"jetty" (box: w across, d along).
 // move: { axis: "y" | "x" | "z", amp, period, phase } makes a platform bob or slide (level 2 driftwood, level 3 bridge).
 // checkpoint: respawn here after a fall. goal: the lighthouse; reaching its door lights the lamp and ends the level.
+//
+// Each level is a chain: every step names the gap from the last platform's edge to the next one's edge, a turn, and the
+// next platform. That keeps every jump inside what the keeper can do (a flat jump covers about 3.5 m, up to 0.6 m higher).
 
-const stone = (x, z, r, top = 0.45, extra = {}) => ({ kind: "stone", x, z, r, top, ...extra });
-const plank = (x, z, w, d, top, extra = {}) => ({ kind: "plank", x, z, w, d, top, rotY: 0, ...extra });
+// How far a platform reaches from its centre along the walking direction.
+const along = (p) => p.r ?? p.d / 2;
+
+function chain(first, steps) {
+  const out = [first];
+  let heading = 0; // degrees; 0 walks toward -z, positive turns right (+x)
+  for (const s of steps) {
+    const prev = out[out.length - 1];
+    heading += s.turn ?? 0;
+    const p = { ...s.p };
+    const dist = along(prev) + (s.gap ?? 1.4) + along(p);
+    const a = (heading * Math.PI) / 180;
+    p.x = +(prev.x + Math.sin(a) * dist).toFixed(2);
+    p.z = +(prev.z - Math.cos(a) * dist).toFixed(2);
+    if (p.kind === "plank" || p.kind === "jetty") p.rotY = p.rotY ?? -a;
+    out.push(p);
+  }
+  return out;
+}
+
+const stone = (r, top, extra = {}) => ({ kind: "stone", r, top, ...extra });
+const plank = (w, d, top, extra = {}) => ({ kind: "plank", w, d, top, ...extra });
+const cliff = (r, top, extra = {}) => ({ kind: "cliff", r, top, ...extra });
+const bob = (amp, period, phase) => ({ move: { axis: "y", amp, period, phase } });
+const slide = (axis, amp, period, phase) => ({ move: { axis, amp, period, phase } });
+
+// The goal sits on the last platform (a cliff), a little behind its centre.
+function goalOn(plats, extra) {
+  const c = plats[plats.length - 1];
+  return { x: c.x + 1, z: c.z - 2.5, ...extra };
+}
+
+const L1 = chain({ kind: "stone", x: 0, z: 0, r: 2.2, top: 0.5, checkpoint: true }, [
+  { gap: 1.0, turn: 8, p: stone(1.1, 0.45) },
+  { gap: 1.4, turn: 22, p: stone(1.0, 0.45) },
+  { gap: 1.5, turn: -40, p: stone(1.2, 0.45) },
+  { gap: 1.6, turn: -18, p: stone(1.0, 0.5) },
+  { gap: 1.6, turn: 30, p: stone(1.15, 0.45) },
+  { gap: 1.3, turn: 6, p: { kind: "jetty", w: 2.2, d: 4.4, top: 0.7, checkpoint: true } },
+  { gap: 1.4, turn: 20, p: stone(0.95, 0.5) },
+  { gap: 1.8, turn: 10, p: stone(0.9, 0.55) },
+  { gap: 1.8, turn: -30, p: stone(1.0, 0.5, { sink: true }) }, // sinks while you stand on it
+  { gap: 1.9, turn: -20, p: stone(0.9, 0.6) },
+  // A wide flat rock among tide pools: the second checkpoint.
+  { gap: 1.6, turn: 15, p: stone(2.4, 0.6, { checkpoint: true }) },
+  { gap: 1.4, turn: 35, p: stone(0.8, 0.55) },
+  { gap: 1.4, turn: 10, p: stone(0.8, 0.6) },
+  { gap: 1.5, turn: -25, p: stone(0.8, 0.55, { sink: true }) },
+  { gap: 1.5, turn: -30, p: stone(0.8, 0.6) },
+  { gap: 1.5, turn: -15, p: stone(0.85, 0.6) },
+  { gap: 1.6, turn: 30, p: stone(1.0, 0.65) },
+  // Up toward the island.
+  { gap: 1.5, turn: 5, p: stone(1.2, 1.15) },
+  { gap: 1.4, turn: -10, p: stone(1.0, 1.7) },
+  { gap: 1.0, turn: 5, p: cliff(7.5, 2.3, { checkpoint: true }) },
+]);
+
+const L2 = chain({ kind: "cliff", x: 0, z: 2, r: 4, top: 1.0, checkpoint: true }, [
+  { gap: 1.2, p: plank(1.3, 2.6, 0.55, bob(0.3, 3.2, 0)) },
+  { gap: 1.3, turn: -20, p: plank(1.3, 2.6, 0.5, bob(0.35, 3.2, 1.6)) },
+  { gap: 1.4, turn: 15, p: stone(1.0, 0.8) },
+  { gap: 1.5, turn: 20, p: plank(1.3, 2.8, 0.8, slide("x", 1.8, 5, 0)) },
+  { gap: 1.4, turn: -10, p: stone(1.1, 1.0, { checkpoint: true }) },
+  { gap: 1.3, turn: -25, p: plank(1.2, 2.4, 0.9, bob(0.5, 2.6, 0.8)) },
+  { gap: 1.3, turn: 20, p: plank(1.2, 2.4, 1.2, bob(0.5, 2.6, 2.1)) },
+  { gap: 1.4, turn: 15, p: stone(0.9, 1.3) },
+  { gap: 1.4, turn: -5, p: plank(1.2, 2.6, 1.4, slide("z", 1.2, 4.4, 0)) },
+  { gap: 1.6, turn: -10, p: stone(1.1, 1.6, { checkpoint: true }) },
+  { gap: 1.4, turn: -25, p: plank(1.2, 2.4, 1.7, slide("x", 2.0, 4, 1)) },
+  { gap: 1.3, turn: 20, p: stone(0.85, 1.9, { sink: true }) },
+  { gap: 1.3, turn: 20, p: plank(1.2, 2.4, 2.0, bob(0.6, 2.4, 0)) },
+  { gap: 1.3, turn: -15, p: plank(1.2, 2.4, 2.1, bob(0.6, 2.4, 1.6)) },
+  { gap: 1.4, turn: -10, p: stone(1.0, 2.3) },
+  { gap: 1.0, turn: 5, p: cliff(6.5, 2.6, { checkpoint: true }) },
+]);
+
+// Rope-bridge planks, close enough to walk on; they sway, and the gusts are what make the bridge hard.
+const bridge = (n, top, w = 1.5) => Array.from({ length: n }, (_, i) => ({ gap: 0.12, p: plank(w, 1.0, top, { bridge: true, ...bob(0.1, 2.2, i * 0.45) }) }));
+
+const L3 = chain({ kind: "cliff", x: 0, z: 2, r: 4, top: 1.2, checkpoint: true }, [
+  { gap: 1.3, turn: 10, p: stone(1.0, 1.0) },
+  { gap: 1.5, turn: -25, p: stone(0.9, 1.3) },
+  { gap: 1.5, turn: 20, p: stone(0.85, 1.6) },
+  { gap: 1.4, turn: -5, p: cliff(3.2, 2.2, { checkpoint: true }) },
+  { gap: 0.8, p: plank(1.5, 1.0, 2.25, { bridge: true, ...bob(0.1, 2.2, 0) }) },
+  ...bridge(12, 2.25),
+  { gap: 0.8, p: cliff(3.0, 2.6, { checkpoint: true }) },
+  { gap: 1.4, turn: -30, p: stone(0.85, 2.9) },
+  { gap: 1.5, turn: 25, p: stone(0.8, 3.3, { sink: true }) },
+  { gap: 1.5, turn: 25, p: stone(0.85, 3.7) },
+  { gap: 1.4, turn: -15, p: cliff(2.8, 4.0, { checkpoint: true }) },
+  // A second, higher and narrower bridge.
+  { gap: 0.8, turn: -10, p: plank(1.4, 1.0, 4.1, { bridge: true, ...bob(0.12, 2.0, 0) }) },
+  ...bridge(8, 4.1, 1.4),
+  { gap: 1.2, p: stone(0.9, 4.3) },
+  { gap: 1.3, turn: 20, p: stone(0.85, 4.6) },
+  { gap: 1.0, turn: -10, p: cliff(5.5, 4.9, { checkpoint: true }) },
+]);
 
 export const LEVELS = [
   {
@@ -13,36 +112,22 @@ export const LEVELS = [
     subtitle: "Morning mist over the shallows",
     palette: {
       skyTop: "#e9d9cf", skyHorizon: "#f6e6da", fog: "#efe2d6", fogNear: 14, fogFar: 105,
-      water: "#9ad4c8", waterDeep: "#66aca7", sun: "#ffe6c8", sunIntensity: 1.7, ambient: "#fff3e6", ambientIntensity: 1.15,
+      water: "#9ad4c8", waterDeep: "#66aca7", waves: 0.05, sun: "#ffe6c8", sunIntensity: 1.7, ambient: "#fff3e6", ambientIntensity: 1.15,
       lantern: 1.2,
     },
     start: { x: 0, z: 0 },
-    platforms: [
-      stone(0, 0, 2.2, 0.5, { checkpoint: true }),
-      stone(0.6, -4.2, 1.1),
-      stone(2.2, -7.6, 1.0),
-      stone(1.0, -11.2, 1.2),
-      stone(-1.4, -14.2, 1.0, 0.5),
-      stone(-2.0, -18.0, 1.15),
-      // A wooden jetty halfway: the first checkpoint.
-      plank(-1.0, -22.6, 2.2, 4.4, 0.7, { kind: "jetty", checkpoint: true }),
-      stone(1.2, -27.0, 0.95, 0.5),
-      stone(3.0, -30.4, 0.9, 0.55),
-      stone(2.0, -34.0, 1.0, 0.5, { sink: true }), // sinks a little while you stand on it
-      stone(-0.4, -37.2, 0.9, 0.6),
-      stone(-0.6, -41.0, 1.2, 1.1),
-      stone(0.8, -44.4, 1.0, 1.7),
-      { kind: "cliff", x: 1.5, z: -53, r: 7.5, top: 2.3, checkpoint: true },
-    ],
-    goal: { x: 2.5, z: -56, kind: "lighthouse", cottage: { x: -2.6, z: -55.5, rotY: 0.3 } },
+    platforms: L1,
+    goal: goalOn(L1, { kind: "lighthouse", cottage: { dx: -4.5, dz: 1.0, rotY: 0.3 } }),
     scenery: [
-      { kind: "cliff", x: -26, z: -70, r: 9, top: 9 },
-      { kind: "cliff", x: 30, z: -85, r: 11, top: 12 },
-      { kind: "cliff", x: -18, z: -20, r: 4, top: 3.5 },
-      { kind: "cliff", x: 20, z: -30, r: 5, top: 5 },
+      { kind: "cliff", x: -30, z: -80, r: 9, top: 9 },
+      { kind: "cliff", x: 34, z: -100, r: 11, top: 12 },
+      { kind: "cliff", x: -22, z: -25, r: 4, top: 3.5 },
+      { kind: "cliff", x: 24, z: -40, r: 5, top: 5 },
+      { kind: "cliff", x: -26, z: -55, r: 3.5, top: 2.5 },
       { kind: "stone", x: 9, z: -10, r: 2.2, top: 0.6 },
-      { kind: "stone", x: -9, z: -32, r: 1.6, top: 0.4 },
-      { kind: "stone", x: 10, z: -46, r: 1.8, top: 0.5 },
+      { kind: "stone", x: -10, z: -36, r: 1.6, top: 0.4 },
+      { kind: "stone", x: 14, z: -58, r: 1.8, top: 0.5 },
+      { kind: "stone", x: -12, z: -64, r: 1.2, top: 0.4 },
     ],
   },
   {
@@ -51,34 +136,19 @@ export const LEVELS = [
     subtitle: "Driftwood rides the swell",
     palette: {
       skyTop: "#cfe3dc", skyHorizon: "#eef1e2", fog: "#d6e8e0", fogNear: 14, fogFar: 100,
-      water: "#8fd3c3", waterDeep: "#4ea39c", sun: "#fff4d6", sunIntensity: 2.0, ambient: "#e8fff6", ambientIntensity: 1.15,
+      water: "#8fd3c3", waterDeep: "#4ea39c", waves: 0.08, sun: "#fff4d6", sunIntensity: 2.0, ambient: "#e8fff6", ambientIntensity: 1.15,
       lantern: 1.4,
     },
     start: { x: 0, z: 0 },
-    platforms: [
-      { kind: "cliff", x: 0, z: 2, r: 4, top: 1.0, checkpoint: true },
-      plank(0.5, -4.9, 1.3, 2.6, 0.55, { move: { axis: "y", amp: 0.3, period: 3.2, phase: 0 } }),
-      plank(-1.2, -9.2, 1.3, 2.6, 0.45, { rotY: 0.4, move: { axis: "y", amp: 0.35, period: 3.2, phase: 1.6 } }),
-      stone(-1.5, -13.2, 1.0, 0.8),
-      plank(0.8, -16.8, 1.3, 2.8, 0.8, { move: { axis: "x", amp: 2.2, period: 5, phase: 0 } }),
-      stone(1.0, -20.8, 1.1, 1.0, { checkpoint: true }),
-      plank(-1.2, -24.4, 1.2, 2.4, 0.9, { move: { axis: "y", amp: 0.5, period: 2.6, phase: 0.8 } }),
-      plank(-0.2, -28.0, 1.2, 2.4, 1.2, { rotY: -0.5, move: { axis: "y", amp: 0.5, period: 2.6, phase: 2.1 } }),
-      plank(1.6, -31.6, 1.2, 2.6, 1.4, { move: { axis: "z", amp: 1.6, period: 4.4, phase: 0 } }),
-      stone(1.4, -35.6, 1.1, 1.6, { checkpoint: true }),
-      plank(-0.6, -39.2, 1.2, 2.4, 1.7, { move: { axis: "x", amp: 2.4, period: 4, phase: 1 } }),
-      plank(0.4, -43.0, 1.2, 2.4, 2.0, { move: { axis: "y", amp: 0.6, period: 2.4, phase: 0 } }),
-      { kind: "cliff", x: 0.5, z: -51, r: 6.5, top: 2.6, checkpoint: true },
-    ],
-    goal: { x: 1.0, z: -53.5, kind: "lighthouse", tint: { band: "#e9e4d4", stripe: "#3f8f8a" } },
-    // Rock pillars on both sides make the cave corridor; two arches meet over it.
+    platforms: L2,
+    goal: goalOn(L2, { kind: "lighthouse", tint: { white: "#e9e4d4", red: "#3f8f8a" } }),
+    // Rock pillars on both sides of the path make the cave corridor; arches meet over it.
     scenery: [
-      ...[-4, -12, -20, -28, -36, -44].flatMap((z, i) => [
-        { kind: "cliff", x: -9 - (i % 2) * 2, z, r: 3.2, top: 14 + (i % 3) * 2 },
-        { kind: "cliff", x: 10 + (i % 2) * 2, z: z - 3, r: 3.4, top: 13 + (i % 2) * 3 },
+      ...L2.filter((_, i) => i % 2 === 0).flatMap((p, i) => [
+        { kind: "cliff", x: p.x - 12 - (i % 2) * 2, z: p.z, r: 3.0, top: 11 + (i % 3) * 2 },
+        { kind: "cliff", x: p.x + 13 + (i % 2) * 2, z: p.z - 3, r: 3.2, top: 10 + (i % 2) * 3 },
       ]),
-      { kind: "arch", x: 0, z: -18, span: 22, top: 15 },
-      { kind: "arch", x: 0, z: -38, span: 24, top: 16 },
+      ...[4, 9, 13].map((i) => ({ kind: "arch", x: L2[i].x, z: L2[i].z, span: 27, top: 13 })),
     ],
   },
   {
@@ -86,34 +156,20 @@ export const LEVELS = [
     name: "The Storm Light",
     subtitle: "Bring the light home",
     palette: {
-      skyTop: "#1d2340", skyHorizon: "#3a4466", fog: "#2b3352", fogNear: 12, fogFar: 85,
-      water: "#2f4f66", waterDeep: "#1a2b3d", sun: "#9fb3d9", sunIntensity: 0.9, ambient: "#6f7fb0", ambientIntensity: 0.9,
-      lantern: 3.2,
+      skyTop: "#0f1428", skyHorizon: "#262f4d", fog: "#1d2440", fogNear: 10, fogFar: 70,
+      water: "#2c4a62", waterDeep: "#142235", waves: 0.32, sun: "#8ea3d6", sunIntensity: 0.55, ambient: "#5a6aa0", ambientIntensity: 0.6,
+      lantern: 4.0,
     },
     storm: { rain: true, lightning: true, wind: { every: 7, length: 1.8, force: 2.2 } },
     start: { x: 0, z: 0 },
-    platforms: [
-      { kind: "cliff", x: 0, z: 2, r: 4, top: 1.2, checkpoint: true },
-      stone(1.0, -4.6, 1.0, 1.0),
-      stone(-0.6, -8.2, 0.9, 1.3),
-      stone(0.8, -11.8, 0.85, 1.6),
-      { kind: "cliff", x: 0, z: -18, r: 3.2, top: 2.2, checkpoint: true },
-      // The rope bridge: narrow planks that sway.
-      // The rope bridge: planks close enough to walk on; it sways, and the gusts are what make it hard.
-      ...Array.from({ length: 13 }, (_, i) =>
-        plank(0, -22.0 - i * 1.15, 1.5, 1.0, 2.25, { bridge: true, move: { axis: "y", amp: 0.1, period: 2.2, phase: i * 0.45 } })),
-      { kind: "cliff", x: 0, z: -40.5, r: 3.0, top: 2.6, checkpoint: true },
-      stone(-2.2, -45.2, 0.85, 2.9),
-      stone(-0.4, -48.8, 0.8, 3.3, { sink: true }),
-      stone(1.8, -52.2, 0.85, 3.7),
-      { kind: "cliff", x: 0.5, z: -60, r: 5.5, top: 4.3, checkpoint: true },
-    ],
-    goal: { x: 1.0, z: -61.5, kind: "lighthouse_tall", beam: true },
+    platforms: L3,
+    goal: goalOn(L3, { kind: "lighthouse_tall", beam: true }),
     scenery: [
       { kind: "cliff", x: -22, z: -40, r: 6, top: 10 },
-      { kind: "cliff", x: 24, z: -55, r: 8, top: 14 },
-      { kind: "cliff", x: -30, z: -75, r: 10, top: 16 },
-      { kind: "ship", x: 40, z: -110 },
+      { kind: "cliff", x: 24, z: -60, r: 8, top: 14 },
+      { kind: "cliff", x: -30, z: -95, r: 10, top: 16 },
+      { kind: "cliff", x: 20, z: -20, r: 4, top: 6 },
+      { kind: "ship", x: 45, z: -130 },
     ],
   },
 ];

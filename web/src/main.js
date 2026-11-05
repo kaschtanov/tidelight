@@ -121,22 +121,37 @@ async function startLevel(i) {
   ui.done.hidden = true;
   ui.hud.hidden = false;
   ui.levelName.textContent = `${level.id} · ${level.name}`;
+  document.body.classList.toggle("night", !!level.storm);
   showCard(`Chapter ${level.id}`, level.name, level.subtitle);
 }
 
+// Card, fall flash and lightning run on game time (not CSS clocks), so a recording stepped frame by frame shows them right.
+const fx = { card: -99, flash: -99, bolt: -99, toast: -99 };
 function showCard(kicker, title, sub) {
   ui.card.innerHTML = `<p class="kicker">${kicker}</p><h2>${title}</h2><p class="sub">${sub}</p>`;
-  ui.card.classList.remove("show");
-  void ui.card.offsetWidth;
-  ui.card.classList.add("show");
+  fx.card = state.time;
 }
 
-let toastTimer = 0;
+function drawFx() {
+  const t = state.time;
+  const c = t - fx.card;
+  ui.card.style.opacity = c < 0 || c > 4.2 ? 0 : c < 0.6 ? c / 0.6 : c > 3 ? 1 - (c - 3) / 1.2 : 1;
+  ui.card.style.transform = `translate(-50%, ${c < 0.6 ? 8 * (1 - c / 0.6) : 0}px)`;
+  const f = t - fx.flash;
+  const b = t - fx.bolt;
+  const flash = f >= 0 && f < 0.7 ? 0.9 * (1 - f / 0.7) : 0;
+  const bolt = b >= 0 && b < 0.5 ? (b < 0.08 ? 0.5 : b < 0.15 ? 0.1 : 0.45 * (1 - (b - 0.15) / 0.35)) : 0;
+  ui.flash.style.background = bolt > flash ? "#e8ecff" : "#f3ebdf";
+  ui.flash.style.opacity = Math.max(flash, bolt);
+  const o = t - fx.toast;
+  const on = o >= 0 && o < 1.8 ? Math.min(o / 0.25, 1, (1.8 - o) / 0.25) : 0;
+  ui.toast.style.opacity = on;
+  ui.toast.style.transform = `translate(-50%, ${8 * (1 - on)}px)`;
+}
+
 function toast(text) {
   ui.toast.textContent = text;
-  ui.toast.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ui.toast.classList.remove("show"), 1600);
+  fx.toast = state.time;
 }
 
 player.onLand = (obj) => {
@@ -152,9 +167,7 @@ function respawn() {
   state.falls++;
   const c = state.checkpoint;
   player.place(c.x, c.y + 0.05, c.z);
-  ui.flash.classList.remove("show");
-  void ui.flash.offsetWidth;
-  ui.flash.classList.add("show");
+  fx.flash = state.time;
 }
 
 function lightTheLamp() {
@@ -276,7 +289,7 @@ function frame(dt) {
     if (!state.lit && Math.hypot(player.root.position.x - g.x, player.root.position.z - (g.z + 2)) < 2.2 && player.grounded) lightTheLamp();
     if (state.lit) {
       g.lit = Math.min((g.lit ?? 0) + dt * 0.6, 1);
-      g.lampLight.intensity = g.lit * 60;
+      g.lampLight.intensity = g.lit * 14;
       if (g.lamp) {
         g.lamp.material.emissive = new THREE.Color("#ffcf6a");
         g.lamp.material.emissiveIntensity = g.lit * 1.5;
@@ -291,9 +304,9 @@ function frame(dt) {
     const target = player.root.position;
     const dist = 6.8;
     const want = new THREE.Vector3(target.x + Math.sin(camYaw) * Math.cos(camPitch) * dist, target.y + 1.6 + Math.sin(camPitch) * dist, target.z + Math.cos(camYaw) * Math.cos(camPitch) * dist);
-    if (state.lit) want.set(g.x + 9, g.y + 6, g.z + 12); // pull back to watch the lamp
-    camPos.lerp(want, 1 - Math.exp(-dt * (state.lit ? 1.5 : 6)));
-    look.lerp(state.lit ? new THREE.Vector3(g.x, g.y + 6, g.z) : new THREE.Vector3(target.x, target.y + 1.9, target.z), 1 - Math.exp(-dt * 8));
+    if (state.lit) want.set(g.x + 13, g.y + 7, g.z + 22); // pull back to watch the lamp
+    camPos.lerp(want, 1 - Math.exp(-dt * (state.lit ? 1.2 : 6)));
+    look.lerp(state.lit ? new THREE.Vector3(g.x, g.y + 5, g.z) : new THREE.Vector3(target.x, target.y + 1.9, target.z), 1 - Math.exp(-dt * 8));
     camera.position.copy(camPos);
     camera.lookAt(look);
 
@@ -317,10 +330,8 @@ function frame(dt) {
       }
       state.rain.geometry.attributes.position.needsUpdate = true;
       if (Math.random() < dt * 0.12) {
-        hemi.intensity = 4;
-        ui.flash.classList.remove("bolt");
-        void ui.flash.offsetWidth;
-        ui.flash.classList.add("bolt");
+        hemi.intensity = 3;
+        fx.bolt = state.time;
       }
       hemi.intensity += (state.level.palette.ambientIntensity - hemi.intensity) * Math.min(dt * 4, 1);
     }
@@ -329,12 +340,14 @@ function frame(dt) {
     camera.lookAt(0, 2, -20);
   }
 
+  drawFx();
   renderer.render(scene, camera);
 }
 
 // ---------- title ----------
 function showTitle() {
   state.mode = "title";
+  document.body.classList.remove("night");
   ui.title.hidden = false;
   ui.hud.hidden = true;
   ui.done.hidden = true;
@@ -364,7 +377,7 @@ window.__tidelight = {
   bot,
   get state() {
     const p = player.root.position;
-    return { mode: state.mode, level: state.levelIndex, x: p.x, y: p.y, z: p.z, grounded: player.grounded, lit: state.lit, falls: state.falls, camYaw, groundIndex: window.__tidelight.groundIndex, time: state.time };
+    return { mode: state.mode, level: state.levelIndex, x: p.x, y: p.y, z: p.z, grounded: player.grounded, lit: state.lit, falls: state.falls, camYaw, groundIndex: window.__tidelight.groundIndex, time: state.time, vx: player.vel.x, vz: player.vel.z };
   },
   setYaw: (y) => (camYaw = y),
   // Where each level platform is right now (moving ones included), in the order of the level data.

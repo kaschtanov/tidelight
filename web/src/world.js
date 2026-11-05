@@ -123,13 +123,14 @@ export function makeSea(palette) {
       fogNear: { value: palette.fogNear },
       fogFar: { value: palette.fogFar },
       time: { value: 0 },
+      waves: { value: palette.waves ?? 0.05 },
     },
     vertexShader: `
       varying vec3 vWorld; varying float vDepth;
-      uniform float time;
+      uniform float time, waves;
       void main(){
         vec4 w = modelMatrix * vec4(position, 1.0);
-        w.y += sin(w.x * 0.35 + time * 0.9) * 0.05 + cos(w.z * 0.3 + time * 0.7) * 0.05;
+        w.y += (sin(w.x * 0.35 + time * 0.9) + cos(w.z * 0.3 + time * 0.7) + 0.6 * sin((w.x + w.z) * 0.8 + time * 1.7)) * waves;
         vWorld = w.xyz;
         vec4 mv = viewMatrix * w;
         vDepth = -mv.z;
@@ -263,13 +264,13 @@ export async function buildLevel(level, scene) {
     const cone = new THREE.ConeGeometry(4, 60, 24, 1, true);
     cone.translate(0, -30, 0);
     cone.rotateZ(Math.PI / 2);
-    beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: "#ffe2a0", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: "#ffd98a", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false }));
     beam.position.copy(lampLight.position);
     group.add(beam);
   }
   if (g.cottage) {
     const c = ink(paint(await loadModel("cottage")), 0.02);
-    c.position.set(g.cottage.x, top, g.cottage.z);
+    c.position.set(g.x + g.cottage.dx, top, g.z + g.cottage.dz);
     c.rotation.y = g.cottage.rotY;
     group.add(c);
   }

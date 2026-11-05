@@ -1,7 +1,7 @@
 // The autopilot that plays a level: walks to the next platform and jumps when it can land there.
 // Used for the automated playtest (tools/playtest.mjs) and for recording the demo (?bot=1). It plays like a careful
 // beginner, so it also shows where a level is too hard: every fall is logged with the platform it was going for.
-import { GRAVITY, JUMP, SPEED } from "./player.js";
+import { AIR_ACCEL, GRAVITY, JUMP, SPEED } from "./player.js";
 
 // How far a platform reaches from its centre in the direction (ux, uz).
 function extent(p, ux, uz) {
@@ -43,11 +43,19 @@ export function createBot(T) {
     const d = Math.hypot(dx, dz) || 1;
     const ux = dx / d;
     const uz = dz / d;
-    // In the air, ease off near the target so short hops do not overshoot.
-    const ease = s.grounded ? 1 : Math.min(d / 1.2, 1);
-    T.bot.right = ux * ease;
-    T.bot.forward = -uz * ease;
-    if (!s.grounded || last) return;
+    T.bot.right = ux;
+    T.bot.forward = -uz;
+    if (!s.grounded) {
+      // In the air: brake when the speed toward the target would carry past its middle.
+      const v = s.vx * ux + s.vz * uz;
+      if (v > 0 && (v * v) / (2 * AIR_ACCEL) > d - 0.2) {
+        const sp = Math.hypot(s.vx, s.vz) || 1;
+        T.bot.right = -s.vx / sp;
+        T.bot.forward = s.vz / sp;
+      }
+      return;
+    }
+    if (last) return;
 
     const cur = plats[s.groundIndex];
     const near = d - extent(tgt, -ux, -uz); // to the target's near edge
