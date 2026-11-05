@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tidelight</title>
+    <meta name="description" content="A young lighthouse keeper crosses the stepping stones to light the lamps along the coast. A small watercolour game." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="./assets/index-DAxfdhdN.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D24fZgt5.css">
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="paper" aria-hidden="true"></div>
+
+    <section id="title">
+      <div class="menu">
+        <h1>Tidelight</h1>
+        <p class="tag">Three lamps have gone dark along the coast.</p>
+        <nav>
+          <button id="continue" hidden>Continue</button>
+          <button id="new">New game</button>
+          <button id="controls">Controls</button>
+        </nav>
+        <div id="help" hidden>
+          <p><kbd>W A S D</kbd> or arrows · walk</p>
+          <p><kbd>Space</kbd> · jump</p>
+          <p>Drag, or <kbd>Q</kbd> <kbd>E</kbd> · turn the camera</p>
+          <p><kbd>Esc</kbd> · back to this menu</p>
+        </div>
+        <p class="chapters-label">Chapters</p>
+        <ol id="chapters"></ol>
+      </div>
+    </section>
+
+    <section id="hud" hidden>
+      <p id="level-name"></p>
+      <p class="keys">WASD walk · Space jump · drag to look</p>
+    </section>
+    <div id="card" aria-live="polite"></div>
+    <div id="toast" aria-live="polite"></div>
+    <div id="flash"></div>
+    <section id="done" hidden></section>
+
+  </body>
+</html>
