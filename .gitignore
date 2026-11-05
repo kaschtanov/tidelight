@@ -1,0 +1,4 @@
+node_modules/
+web/dist/
+tools/out/
+.DS_Store
